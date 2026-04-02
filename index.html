@@ -173,6 +173,38 @@
     background: var(--amber); border: none; cursor: pointer;
   }
   .tol-value { font-size: 0.62rem; color: var(--amber); letter-spacing: 0.08em; min-width: 40px; }
+
+  /* Popup alert */
+  .popup-overlay {
+    position: fixed; inset: 0; z-index: 100;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.5);
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.3s ease;
+  }
+  .popup-overlay.show { opacity: 1; pointer-events: auto; }
+  .popup-overlay.fadeout { opacity: 0; }
+  .popup-box {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 6px; padding: 28px 36px; text-align: center;
+    max-width: 340px; width: 90%;
+    transform: scale(0.85); transition: transform 0.3s ease;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+  }
+  .popup-overlay.show .popup-box { transform: scale(1); }
+  .popup-overlay.fadeout .popup-box { transform: scale(0.85); }
+  .popup-icon { font-size: 2.8rem; margin-bottom: 12px; }
+  .popup-title {
+    font-family: 'Playfair Display', serif; font-size: 1.4rem;
+    color: var(--cream); margin-bottom: 8px;
+  }
+  .popup-msg {
+    font-size: 0.78rem; color: var(--text-dim); letter-spacing: 0.06em; line-height: 1.6;
+  }
+  .popup-box.success { border-color: var(--green); }
+  .popup-box.success .popup-title { color: var(--green); }
+  .popup-box.fail { border-color: var(--red); }
+  .popup-box.fail .popup-title { color: var(--red); }
 </style>
 </head>
 <body>
@@ -181,6 +213,14 @@
   <h1>🎻 Keman Nota Çalışması</h1>
   <p>Pitch Detection · Treble Clef · Gerçek Zamanlı</p>
 </header>
+
+<div class="popup-overlay" id="popup-overlay">
+  <div class="popup-box" id="popup-box">
+    <div class="popup-icon" id="popup-icon"></div>
+    <div class="popup-title" id="popup-title"></div>
+    <div class="popup-msg" id="popup-msg"></div>
+  </div>
+</div>
 
 <div class="main-card">
 
@@ -522,14 +562,38 @@ function evaluateWindow() {
   }
 }
 
+function showPopup(type, title, msg) {
+  const overlay = document.getElementById('popup-overlay');
+  const box = document.getElementById('popup-box');
+  const iconEl = document.getElementById('popup-icon');
+  const titleEl = document.getElementById('popup-title');
+  const msgEl = document.getElementById('popup-msg');
+
+  box.className = 'popup-box ' + type;
+  iconEl.textContent = type === 'success' ? '🎉' : '😔';
+  titleEl.textContent = title;
+  msgEl.textContent = msg;
+
+  overlay.classList.remove('fadeout');
+  overlay.classList.add('show');
+
+  setTimeout(() => {
+    overlay.classList.add('fadeout');
+    setTimeout(() => {
+      overlay.classList.remove('show', 'fadeout');
+    }, 400);
+  }, 1600);
+}
+
 function onWrong() {
   playSound('wrong');
   stats.wrong++; stats.streak = 0; wrongCount++;
   addHistory('wrong'); updateStats();
   if (wrongCount >= MAX_WRONG) {
     setFeedback(100, 'var(--red)', '4 yanlış — sonraki notaya geçiliyor…');
-    decisionCooldown = Date.now() + 1200;
-    setTimeout(() => nextNote(), 1000);
+    showPopup('fail', 'Bu sefer olmadı', 'Notayı değiştiriyoruz — bir sonrakine hazır ol!');
+    decisionCooldown = Date.now() + 2200;
+    setTimeout(() => nextNote(), 2000);
   } else {
     setFeedback(100, 'var(--red)', 'Yanlış nota — tekrar dene (' + wrongCount + '/' + MAX_WRONG + ')');
     decisionCooldown = Date.now() + 1200;
@@ -541,8 +605,9 @@ function onCorrect() {
   stats.correct++; stats.streak++;
   addHistory('correct'); updateStats();
   setFeedback(100, 'var(--green)', '✓ Harika! Sıradaki nota…');
-  decisionCooldown = Date.now() + 1200;
-  setTimeout(() => nextNote(), 1000);
+  showPopup('success', 'Harika!', currentTarget.tr + (currentTarget.acc || '') + ' notasını doğru çaldın!');
+  decisionCooldown = Date.now() + 2200;
+  setTimeout(() => nextNote(), 2000);
 }
 
 // ─── SES GERİ BİLDİRİMİ ──────────────────────────────────────────────────────
