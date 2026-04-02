@@ -66,7 +66,28 @@
   .target-note-hz { font-size: 0.68rem; color: var(--amber-dim); margin-top: 4px; letter-spacing: 0.1em; }
 
   .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-  @media (max-width: 500px) { .two-col { grid-template-columns: 1fr; } }
+  @media (max-width: 500px) {
+    .two-col { grid-template-columns: 1fr; }
+    body { padding: 16px 8px; }
+    .section-title { font-size: 0.75rem; }
+    .target-note-hz { font-size: 0.85rem; }
+    .listen-status { font-size: 0.82rem; }
+    .detected-note { font-size: 2rem; }
+    .freq-display { font-size: 0.78rem; }
+    .feedback-message { font-size: 0.82rem; }
+    .stat-value { font-size: 1.8rem; }
+    .stat-label { font-size: 0.72rem; }
+    .tol-label { font-size: 0.75rem; }
+    .tol-btn { font-size: 0.75rem; padding: 7px 14px; }
+    .tol-value { font-size: 0.75rem; }
+    .history-dot { width: 11px; height: 11px; }
+    .history-row { gap: 8px; }
+    .start-btn { font-size: 0.9rem; padding: 15px 42px; }
+    #start-screen p { font-size: 0.92rem; }
+    header p { font-size: 0.78rem; }
+    .tolerance-row { gap: 10px; flex-wrap: wrap; }
+    .mic-slider { width: 100%; }
+  }
 
   .staff-container, .strings-container {
     background: var(--surface2); border: 1px solid var(--border);
@@ -114,6 +135,20 @@
     font-size: 0.62rem; letter-spacing: 0.1em; cursor: pointer; transition: all 0.15s; border-radius: 2px;
   }
   .tol-btn.active { border-color: var(--amber); color: var(--amber); background: rgba(212,168,83,0.08); }
+
+  .mic-slider {
+    -webkit-appearance: none; appearance: none;
+    width: 120px; height: 4px; background: var(--border); border-radius: 2px; outline: none; cursor: pointer;
+  }
+  .mic-slider::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%;
+    background: var(--amber); border: none; cursor: pointer;
+  }
+  .mic-slider::-moz-range-thumb {
+    width: 14px; height: 14px; border-radius: 50%;
+    background: var(--amber); border: none; cursor: pointer;
+  }
+  .tol-value { font-size: 0.62rem; color: var(--amber); letter-spacing: 0.08em; min-width: 40px; }
 </style>
 </head>
 <body>
@@ -141,6 +176,11 @@
         <button class="tol-btn active" id="tol-easy"  onclick="setTol(30)">Geniş (~30¢)</button>
         <button class="tol-btn"        id="tol-med"   onclick="setTol(15)">Orta (~15¢)</button>
         <button class="tol-btn"        id="tol-hard"  onclick="setTol(5)">Hassas (~5¢)</button>
+      </div>
+      <div class="tolerance-row">
+        <span class="tol-label">Mikrofon Eşiği:</span>
+        <input type="range" id="mic-threshold" class="mic-slider" min="1" max="50" value="8" step="1" oninput="updateMicThreshold(this.value)">
+        <span class="tol-value" id="mic-threshold-val">0.008</span>
       </div>
     </div>
 
@@ -251,6 +291,8 @@ const STAFF_Y = {
 let audioCtx, analyser, source;
 let currentTarget = null;
 let toleranceCents = 30;
+let micSilence = 0.008;   // sessizlik eşiği
+let micWeak    = 0.02;    // zayıf ses eşiği
 let stats = { correct:0, wrong:0, streak:0 };
 let history = [];
 // 1 saniyelik ortalama sistemi
@@ -260,6 +302,12 @@ let frameBuffer = [];     // { chroma, cents, weak } dizisi
 let windowStart = null;   // pencere başlangıç zamanı
 let lastDecision = null;  // 'correct' | 'wrong' | null — tekrar kararı önle
 let decisionCooldown = 0; // karar sonrası bekleme (ms)
+
+function updateMicThreshold(val) {
+  micSilence = val / 1000;
+  micWeak = micSilence * 2.5;
+  document.getElementById('mic-threshold-val').textContent = micSilence.toFixed(3);
+}
 
 function setTol(val) {
   toleranceCents = val;
@@ -363,7 +411,7 @@ function loop() {
     requestAnimationFrame(loop); return;
   }
 
-  if (rms < 0.008) {
+  if (rms < micSilence) {
     // Sessizlik: pencereyi sıfırla
     if (frameBuffer.length > 0) { frameBuffer = []; windowStart = null; lastDecision = null; }
     setDetected('—', null);
@@ -378,7 +426,7 @@ function loop() {
 
   if (!currentTarget) { requestAnimationFrame(loop); return; }
 
-  const isWeak = rms < 0.02;
+  const isWeak = rms < micWeak;
   const detectedChroma = noteChroma(freq);
   const minCents       = centsFromOctaveIndependent(freq, currentTarget.freq);
   const detectedName   = freqToName(freq);
